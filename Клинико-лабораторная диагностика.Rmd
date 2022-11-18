@@ -1,0 +1,106 @@
+---
+title: "Клинико-лабораторная диагностика"
+author: "Цепелева И."
+date: '2022-11-18'
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(pROC)
+library(gtsummary)
+```
+
+Задание 1 <br>
+Количество пациентов с НГТ: 192 <br>
+Количество пациентов без НГТ: 571 
+
+```{r}
+diabetes <- read.csv("diabetes.csv")
+summary(diabetes)
+
+diabetes <- diabetes %>%
+  filter(Glucose != 0) %>%
+  mutate(Glucose_mm_l = Glucose / 18) %>%
+  mutate(
+    group_НГТ = case_when( #множественное условие
+      Glucose_mm_l < 7.8 ~ "нет НТГ", 
+      Glucose_mm_l >= 7.8 ~ "есть НГТ" ))
+
+sum(diabetes$group_НГТ == "есть НГТ")
+sum(diabetes$group_НГТ == "нет НТГ")
+
+```
+Задание 2
+```{r}
+
+diabetes <- diabetes %>% 
+    mutate(across(Outcome, ~ as.factor(.x)))
+
+diabetes %>%
+  tbl_summary(by = Outcome) %>%
+  add_p()
+
+roc_curve <- roc(Outcome ~ Glucose, data = diabetes, ci = T)
+roc_curve
+
+ggroc(roc_curve) +
+  theme_minimal()
+```
+Задание 3 
+```{r}
+auc(roc_curve)
+```
+Задание 4
+```{r}
+ci(roc_curve)
+```
+Задание 5
+```{r}
+
+diabetes <- diabetes %>%
+  filter(Insulin != 0)
+
+roc_curve_1 <- roc(Outcome ~ Insulin, data = diabetes, ci = T)
+roc_curve_1
+
+ggroc(roc_curve_1) +
+  theme_minimal()
+
+roc_curve_1 %>% coords(x = "best", best.method = "closest.topleft")
+```
+
+Оптимальное пороговое значение инсулина: 121 <br>
+Специфичность: 0.6197719  <br>
+Чувствительность: 0.7846154 <br>
+<br>
+
+Задание 6
+
+```{r}
+
+diabetes %>% 
+    filter(BloodPressure != 0 & SkinThickness != 0 & BMI != 0 & DiabetesPedigreeFunction != 0 & Age != 0)  %>%
+    select(!Glucose_mm_l) %>%
+    select(!group_НГТ) %>%
+    pivot_longer(cols = !Outcome) %>% 
+    group_by(name) %>% 
+    summarise(AUC = roc(Outcome, value, ci = T)$ci[2] %>% round(3),
+              AUC_LCL = roc(Outcome, value, ci = T)$ci[1] %>% round(3),
+              AUC_UCL = roc(Outcome, value, ci = T)$ci[3] %>% round(3))
+
+
+```
+Наибольшей площадью под ROC-кривой обладает переменная Glucose (0.806), именно по уровню глюкозы и ставится диагноз диабет (уровень глюкозы - ключевой параметр).
+<br>
+Наименьшей площадью под ROC-кривой обладают переменные BloodPressure и Pregnancies (0.621).
