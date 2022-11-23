@@ -1,0 +1,124 @@
+---
+title: "Практикум по множественным сравнениям"
+author: "Цепелева И."
+date: '2022-11-19'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F)
+```
+
+```{r}
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+        
+soccer_general <- read.csv("soccer.csv", sep=";")[, 2:6] %>% 
+    mutate(Position = as.factor(Position), 
+    Nationality = as.factor(Nationality), 
+    Age = as.numeric(Age), 
+    Height = as.numeric(Height)
+) %>% 
+filter(Nationality %in% c("Spanish", "Italian", "German", "English", "Argentinian")) 
+
+set.seed(1) 
+
+soccer_wrk <- soccer_general[sample(1:nrow(soccer_general), 150), ] %>% 
+    mutate(Nationality = factor(Nationality))
+```
+
+```{r}
+soccer_general %>% pull(Height) %>% mean(na.rm = TRUE)
+
+ggplot() +
+  geom_boxplot(data = soccer_wrk, aes(x=Height, y=Position)) +
+  theme_gray() +
+  labs(x='Рост', y='Позиция на поле') +
+  geom_vline(aes(xintercept = 182.1458))
+
+```
+<br>
+По boxplot наблюдается разница между средним ростом футболистов, играющих на разных позициях. <br> <br>
+
+Построение доверительных интервалов для попарных разниц между средними (без поправок и с поправкой Бонферрони). <br>
+Необходимо провести 6 попарных сравнений, тогда поправка Бонферрони: conf.level = 1 - (0.5/6) = 0.992 <br>
+Одновременно с этим проверяем, покрывают ли полученные интервалы реальную разницу между средним ростом
+
+```{r}
+Defender <- soccer_wrk %>% filter(Position == "Defender") %>% pull(Height)
+Forward <- soccer_wrk %>% filter(Position == "Forward") %>% pull(Height)
+Midfielder <- soccer_wrk %>% filter(Position == "Midfielder")  %>% pull(Height)
+Goalkeeper <- soccer_wrk %>% filter(Position == "Goalkeeper") %>% pull(Height)
+
+Defender_mean <- soccer_general %>% filter(Position == "Defender") %>% pull(Height) %>% mean(na.rm = TRUE)
+Forward_mean <- soccer_general %>% filter(Position == "Forward") %>% pull(Height) %>% mean(na.rm = TRUE)
+Midfielder_mean <- soccer_general %>% filter(Position == "Midfielder") %>% pull(Height) %>% mean(na.rm = TRUE)
+Goalkeeper_mean <- soccer_general %>% filter(Position == "Goalkeeper") %>% pull(Height) %>% mean(na.rm = TRUE)
+```
+
+```{r}
+t.test(Defender, Forward, paired=F)$conf.int[1:2] #без поправок
+t.test(Defender, Forward, paired=F, conf.level = 0.992)$conf.int[1:2] #с поправкой Бонферрони
+Defender_mean - Forward_mean
+```
+
+```{r}
+t.test(Defender, Midfielder, paired=F)$conf.int[1:2] #без поправок
+t.test(Defender, Midfielder, paired=F, conf.level = 0.992)$conf.int[1:2] #с поправкой Бонферрони
+Defender_mean - Midfielder_mean
+```
+
+```{r}
+t.test(Defender, Goalkeeper, paired=F)$conf.int[1:2] #без поправок
+t.test(Defender, Goalkeeper, paired=F, conf.level = 0.992)$conf.int[1:2] #с поправкой Бонферрони
+Defender_mean - Goalkeeper_mean
+```
+
+```{r}
+t.test(Forward, Goalkeeper, paired=F)$conf.int[1:2] #без поправок
+t.test(Forward, Goalkeeper, paired=F, conf.level = 0.992)$conf.int[1:2] #с поправкой Бонферрони
+Forward_mean - Goalkeeper_mean
+```
+
+```{r}
+t.test(Forward, Midfielder, paired=F)$conf.int[1:2] #без поправок
+t.test(Forward, Midfielder, paired=F, conf.level = 0.992)$conf.int[1:2] #с поправкой Бонферрони
+Forward_mean - Midfielder_mean
+
+```
+```{r}
+t.test(Goalkeeper, Midfielder, paired=F)$conf.int[1:2] #без поправок
+t.test(Goalkeeper, Midfielder, paired=F, conf.level = 0.992)$conf.int[1:2] #с поправкой Бонферрони
+Goalkeeper_mean - Midfielder_mean
+
+```
+Cтатистически значимые различия по росту выявлены между группами : <br>
+Defender, Midfielder <br>
+Defender, Goalkeeper <br>
+Forward, Goalkeeper <br>
+Goalkeeper, Midfielder <br>
+<br>
+
+Интервалы покрывают реальную разницу между средним ростом во всех случаях. <br>
+
+Попарные тесты для разниц между средними:  <br>
+1) без поправок
+
+```{r}
+pairwise.t.test(soccer_wrk$Height, soccer_wrk$Position, p.adjust.method = "none", pool.sd = FALSE)
+```
+
+2) с поправкой Холма
+```{r}
+pairwise.t.test(soccer_wrk$Height, soccer_wrk$Position, p.adjust.method = "holm", pool.sd = FALSE)
+```
+
+3) и поправкой Бенджамини-Хохберга
+
+```{r}
+pairwise.t.test(soccer_wrk$Height, soccer_wrk$Position, p.adjust.method = "BH", pool.sd = FALSE)
+```
+Сколько открытий получилось в каждом случае? Сколько из них ложные? <br>
+В каждом случае получилось 4 открытия, ложных нет.
