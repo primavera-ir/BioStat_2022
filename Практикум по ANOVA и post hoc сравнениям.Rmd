@@ -1,0 +1,111 @@
+---
+title: "Практикум по ANOVA и post hoc сравнениям"
+author: "Цепелева И."
+date: '2022-11-24'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F)
+```
+
+
+```{r}
+library(dplyr)
+
+soccer_general <- read.csv("soccer.csv", sep=";")[, 2:6] %>% 
+    mutate(Position = as.factor(Position), 
+    Nationality = as.factor(Nationality), 
+    Age = as.numeric(Age), 
+    Height = as.numeric(Height)
+) %>% 
+filter(Nationality %in% c("Spanish", "Italian", "German", "English", "Argentinian")) 
+
+set.seed(1) 
+
+soccer_wrk <- soccer_general[sample(1:nrow(soccer_general), 150), ] %>% 
+    mutate(Nationality = factor(Nationality))
+```
+ЗАДАНИЕ 1
+```{r}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Position, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+
+```{r}
+aov(Height ~ Position, data = soccer_wrk) %>% summary
+```
+
+```{r}
+oneway.test(Height ~ Position, data = soccer_wrk) #Welch
+```
+И в том, и в другом случае p-value << 0.05 (1.64e-07 и 1.288e-07), значит, мы можем отвергнуть нулевую гипотезу об отсутствии взаимосвязи между ростом футболиста и его позицией на поле. Другими словами, позиция на поле ассоциирована со средним ростом футболиста, и существует как минимум одна пара групп со статистически значимо отличающимися значениями роста
+
+<br>
+ЗАДАНИЕ 2 <br>
+Процедура Хоторна-Брейца_Вестфала.
+```{r}
+library(multcomp)
+
+m0 <- lm(Height ~ Position, data = soccer_wrk)
+HBW.comp <- m0 %>%  glht(linfct = mcp(Position = "Tukey"))
+
+HBW.comp %>% summary()
+HBW.comp %>% confint()
+```
+Cтатистически значимые различия (p-value < 0.05) выявлены между группами : <br>
+Goalkeeper - Defender <br>
+Midfielder - Defender <br>
+Goalkeeper - Forward <br>
+Midfielder - Goalkeeper <br>
+
+```{r}
+library(ggplot2)
+par(mar = c(5, 10, 4, 2)+0.1)
+HBW.comp %>% plot(xlab = "Height difference (cm)")
+```
+ЗАДАНИЕ 3<br>
+Сравните результаты с результатами, которые вы получили в предыдущем домашнем задании.<br>
+
+Процедура Хоторна-Бретца-Вестфалла еще раз подтвердила статистически значимые различия между группами, полученные в предыдущем домашнем задании.
+
+<br>
+<br>
+
+ЗАДАНИЕ 4 <br>
+Используйте дисперсионный анализ и постхок процедуру ХБФ для того, чтобы выяснить и описать наличие связи между ростом футболиста и страной, за которую он играет. Опишите и интерпретируйте полученные результаты.
+
+```{r}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Nationality, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+<br>
+На первый вгляд значимых различий в росте футболистов в зависимости от их национальности не наблюдается, применим дисперсионный анализ:
+
+
+```{r}
+aov(Height ~ Nationality, data = soccer_wrk) %>% summary
+```
+
+```{r}
+oneway.test(Height ~ Nationality, data = soccer_wrk)
+```
+p-value > 0.05 в обоих случаях, нулевую гипотезу о об отсутствии взаимосвязи между ростом футболиста и его национальностью отвергнуть НЕ можем.
+<br>
+Постхок процедура ХБФ:
+```{r}
+library(multcomp)
+
+m0 <- lm(Height ~ Nationality, data = soccer_wrk)
+HBW.comp <- m0 %>%  glht(linfct = mcp(Nationality = "Tukey"))
+
+HBW.comp %>% summary()
+HBW.comp %>% confint()
+```
+p-value > 0.05 также во всех случаях, значит, статистически значимых различий между ростом спортсмена в зависимости от национальности не выявлено.
