@@ -1,0 +1,184 @@
+---
+title: "HW 2"
+author: "Цепелева И."
+date: '2022-11-18'
+output: 
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: pygments
+    smooth_scroll: no
+    theme: united
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    toc_position: right
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+```
+
+Задание 1
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+
+data <- read.csv('insurance_cost.csv')
+soccer_general <- read.csv("soccer.csv")
+head(data)
+```
+
+Задание 2
+```{r}
+library(plotly)
+plot_ly(
+  data = data,
+  x = ~ bmi,
+  y = ~ charges,
+  color = ~ smoker,
+  type = 'scatter', 
+  mode = "markers", 
+  size = 1.5) %>%
+layout( #оси, названия осей
+    title = 'График зависимости уровня ИМТ и затрат на лечение',
+    yaxis = list(title = 'ИМТ',
+                 zeroline = FALSE), 
+    xaxis = list(title = 'Затраты на лечение',
+                 zeroline = FALSE))
+```
+
+
+Задание 3
+
+```{r}
+plot <- ggplot(data = data, aes(x = bmi, y = charges, color = smoker))+
+  geom_point(size = 1.5) +
+  ggtitle('График зависимости уровня ИМТ и затрат на страховку') +
+  labs(y = "Затраты на лечение", x='ИМТ')
+  
+ggplotly(plot)
+```
+
+Задание 4
+```{r}
+library(corrplot)
+data_cor <- cor(data %>% select(is.integer | is.numeric))
+
+corrplot(data_cor, method = 'circle')
+corrplot(data_cor, method = 'shade')
+corrplot(data_cor, method = 'pie')
+#?corrplot
+```
+
+Задание 5
+<br>
+sex (1-male, 0- female)
+```{r}
+data_new <- data %>% 
+  mutate(sex = ifelse(sex == "male", 1, 0)) %>%
+  mutate(smoker = ifelse(smoker == "yes", 1, 0)) %>% 
+  mutate(northeast = ifelse(region == "northeast", 1, 0)) %>%
+  mutate(northwest = ifelse(region == "northwest", 1, 0)) %>%
+  mutate(southwest = ifelse(region == "southwest", 1, 0)) %>%
+  mutate(southeast = ifelse(region == "southeast", 1, 0)) %>%
+  select(!region)
+```
+
+Задание 6 
+<br>
+Постройте иерархическую кластеризацию на этом датафрейме
+```{r}
+library(factoextra)
+data_new_scaled <- scale(data_new) #приведение к z-величинам
+#head(data_new_scaled)
+
+data_new_dist <- dist(data_new_scaled, method = "euclidean")
+as.matrix(data_new_dist)[1:6,1:6] #создание матрицы дистанций
+
+data_new_hc <- hclust(d = data_new_dist, 
+                        method = "ward.D2") #дендрограмма кластеров
+
+fviz_dend(data_new_hc, 
+          cex = 0.1) # cex() - размер лейблов
+
+```
+
+Задание 7
+```{r}
+fviz_dend(data_new_hc, k = 4, # Cut in four groups
+cex = 0.5, # label size
+k_colors = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+color_labels_by_k = TRUE, # color labels by groups
+rect = TRUE # Add rectangle around groups
+)
+
+library(dendextend)
+# Compute 2 hierarchical clusterings
+hc1 <- hclust(data_new_dist, method = "average")
+hc2 <- hclust(data_new_dist, method = "ward.D2")
+# Create two dendrograms
+dend1 <- as.dendrogram (hc1)
+dend2 <- as.dendrogram (hc2)
+# Create a list to hold dendrograms
+dend_list <- dendlist(dend1, dend2)
+tanglegram(dend1, dend2)
+```
+
+
+Задание 8
+```{r}
+library(pheatmap)
+pheatmap(data_new_scaled)
+```
+
+Задания 9 и 10
+```{r eval=FALSE, include=T}
+library(FactoMineR)
+library(ggbiplot) #библиотека, которая почему-то не хочет устанавливаться, как ни крути)))
+
+data_full.pca <- prcomp(data_new, 
+                        scale = T)
+
+fviz_eig(data_full.pca, 
+         addlabels = T, 
+         ylim = c(0, 40))
+
+fviz_pca_var(data_full.pca, col.var = "contrib")
+
+fviz_contrib(data_full.pca, choice = "var", axes = 1, top = 24) # 1
+fviz_contrib(data_full.pca, choice = "var", axes = 2, top = 24) # 2
+fviz_contrib(data_full.pca, choice = "var", axes = 3, top = 24) # 3
+
+ggbiplot(data_full.pca, 
+         scale=0, alpha = 0.2) + 
+  theme_minimal()
+
+
+data_new <- data_new %>% 
+  mutate(
+    age_group = case_when( #множественное условие
+      age < 35 ~ "age: 21-34", 
+      age >= 35 & age < 50 ~ "age: 35-49", 
+      age >= 50 ~ "age: 50+"  )) %>%
+  mutate(smoke_group = case_when(
+    smoker == 0 ~ "не курит",
+    smoker == 1 ~ "курит"))
+
+ggbiplot(insurance_pca, 
+         scale=0, 
+         groups = as.factor(data$age_group), 
+         ellipse = T,
+         alpha = 0.2)
+
+ggbiplot(insurance_pca, 
+         scale=0, 
+         groups = as.factor(data$smoke_group), 
+         ellipse = T,
+         alpha = 0.2)
+
+```
+
