@@ -1,0 +1,126 @@
+---
+title: "Многофакторный анализ"
+author: "Цепелева И.А."
+date: '2023-01-18'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+```
+
+ЗАДАНИЕ 1 <br>
+<br>
+Диагональ ковариационной матрицы - это дисперсии каждой из случайных величин. <br>
+Другие значения в матрице представляют собой ковариации между различными субъектами. <br>
+
+а)
+
+```{r}
+library(mvtnorm)
+f <- rmvnorm(n=100, mean = c(85.5, 5.4), sigma = matrix(c(13.25^2, 0.6*13.25*1.45, 0.6*13.25*1.45, 1.45^2), ncol = 2))
+f <- as.data.frame(f)
+
+summary(lm(f$V1 ~ f$V2))
+```
+
+```{r}
+#проверим, как среднее влияет на полученные оценки
+f_mean <- as.data.frame(rmvnorm(n=100, mean = c(171, 10.8), sigma = matrix(c(13.25^2, 0.6*13.25*1.45, 0.6*13.25*1.45, 1.45^2), ncol = 2)))
+summary(lm(f_mean$V1 ~ f_mean$V2))
+
+#влияние дисперсии
+f_disp <- as.data.frame(rmvnorm(n=100, mean = c(85.5, 5.4), sigma = matrix(c(4*13.25^2, 0.6*2*13.25*1.45, 0.6*2*13.25*1.45, 1.45^2), ncol = 2)))
+summary(lm(f_disp$V1 ~ f_disp$V2))
+#(Intercept) уменьшение оценки
+
+#влияние корреляции
+f_cor <- as.data.frame(rmvnorm(n=100, mean = c(85.5, 5.4), sigma = matrix(c(13.25^2, 0.3*13.25*1.45, 0.3*13.25*1.45, 1.45^2), ncol = 2)))
+summary(lm(f_cor$V1 ~ f_cor$V2))
+#снижение перед f_cor$V2
+
+library(ggplot2)
+ggplot()+
+  geom_point(data=f, aes(x=V1, y=V2)) +
+  geom_smooth(data=f, aes(x=V1, y=V2), method=lm)
+```
+
+б) Гипотезу о нормальном распределении остатков проверяем с помощью теста Шапиро-Уилка
+
+```{r}
+plot(lm(f$V1 ~ f$V2))
+fit <- lm(f$V1 ~ f$V2)
+shapiro.test(residuals(fit,type="response"))
+```
+p-value = 0.545, отклонений нет, остатки распределены нормально.
+<br>
+с)
+
+```{r}
+f$V3 <- rnorm(100, 0, 100)
+summary(lm(f$V1 ~ f$V2 + f$V3))
+```
+Было: <br>
+Multiple R-squared:  0.3969,	Adjusted R-squared:  0.3908  <br>
+<br>
+<br>
+Стало: <br>
+Multiple R-squared:  0.3971,	Adjusted R-squared:  0.3846 <br>
+Multiple R-squared:  0.4202,	Adjusted R-squared:  0.4083 <br>
+Multiple R-squared:  0.3972,	Adjusted R-squared:  0.3848 <br>
+
+Коэффициент детерминации увеличился во всех симуляциях,а модифицированный коэффициент детерминации - то увеличивался, то уменьшался.
+<br>
+!!! Значение коэффициента детерминации растет с увеличением числа регрессоров.
+
+ЗАДАНИЕ 2
+
+```{r}
+x1 <- rnorm(50, 0, 100)
+x2 <- x1*(1+rnorm(50, 0, 0.01))
+x3 <- x1*(1+rnorm(50, 0, 0.05))
+x4 <- x1 + rnorm(50, 0, 0.02)
+x5 <- rnorm(50, 0, 0.01)+x3+x2
+
+y = x1 + x2 + 2*x3 + x4 + 6*x5 + rnorm(50, 0, 1)
+summary(lm(y~x1+x2+x3+x4+x5))
+```
+```{r}
+library(glmnet)
+X <- matrix(c(x1, x2, x3, x4, x5), ncol = 5)
+
+la.eq <- glmnet(X,y, family = 'gaussian', intercept = F, alpha = 1) 
+coef.glmnet(la.eq , s=0.2)
+matplot(log(la.eq$lambda), t(la.eq$beta), type='l', main='Lasso', lwd=2)
+
+predict(la.eq, X, type = "coefficients", s=0.2)
+
+```
+Значения коэффициентов сильно изменились.
+Высокий коэффициент только при х1, что обусловлено сильной зависимостью других предикторов именно от х1
+<br>
+
+Пример сильно зависимых показателей, которые могут быть связаны регрессионным соотношением: высвобождение лекарственного средства из липосом в ЖКТ, зависимость концентрации препарата от времени
+
+<br>
+
+ЗАДАНИЕ 3
+```{r}
+library(dplyr)
+s <- data.frame(Neu = rnorm(201, mean = 80, sd = 5) %>% round(0), Ly = rnorm(201, mean = 20, sd = 5)%>%round(0))
+
+s$Sepsis <- ifelse(s$Neu/s$Ly < 3, 0, (s$Neu/s$Ly - 3)/6 )
+s$Sepsis <- ifelse(s$Neu/s$Ly > 9, 1, s$Sepsis )
+```
+
+```{r}
+summary(glm(Sepsis ~ Neu + Ly, s, family = gaussian))
+```
+Какая вероятность для случайной величины Sepsis быть равной 1, если Neu = 90, а Ly = 15? Какую вероятность предсказывает ваша модель (воспользуйтесь функцией predict)?
+
+```{r}
+data <- data.frame(Neu = 90, Ly = 15)
+predict(glm(Sepsis ~ Neu + Ly, s, family = gaussian), data)
+```
+Вероятность равна 0.4989993.
+Если расчитывать по формуле, NLR = 90/15 = 6, p=0.5
